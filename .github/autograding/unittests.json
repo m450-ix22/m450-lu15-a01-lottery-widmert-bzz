@@ -1,0 +1,20 @@
+[
+  {
+    "name": "test_main_exit",
+    "function": "test_main_exit",
+    "timeout": 10,
+    "points": 1
+  },
+  {
+    "name": "test_main_money",
+    "function": "test_main_money",
+    "timeout": 10,
+    "points": 1
+  },
+  {
+    "name": "test_main_ticket",
+    "function": "test_main_ticket",
+    "timeout": 10,
+    "points": 1
+  }
+]
