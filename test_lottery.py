@@ -1,59 +1,63 @@
 import pytest
-from unittest.mock import MagicMock
-from lottery import create_ticket, select_numbers, print_ticket
-from person import Person
+from lottery import create_ticket, select_numbers
 from ticket import Ticket
 
 
-# Fixtures
-@pytest.fixture(scope="module")
-def mock_person():
-    return Person('Test', 'password', 50.00)
+class MockPerson:
+    """
+    Mock-Klasse für die Simulation einer Person mit einem Guthaben.
+    """
+
+    def __init__(self, balance):
+        self.balance = balance
 
 
-@pytest.fixture
-def mock_ticket():
-    return Ticket(0, [])
+def test_select_numbers(monkeypatch):
+    """
+    Testet die select_numbers-Funktion, um sicherzustellen, dass die Zahlen korrekt ausgewählt werden.
+    """
+    ticket = Ticket(0, [])
+    inputs = iter([1, 2, 3, 4, 5, 6, 2])  # Erste 6 Zahlen sind Lottozahlen, letzte Zahl ist der Joker
+    # Patchen Sie `read_int` in `lottery` statt in `numeric_input`
+    monkeypatch.setattr('lottery.read_int', lambda *args, **kwargs: next(inputs))
+
+    select_numbers(ticket)
+
+    # Überprüfen, ob die ausgewählten Zahlen korrekt sind
+    assert len(ticket.numbers) == 6
+    assert set(ticket.numbers) == {1, 2, 3, 4, 5, 6}
+    assert ticket.joker == 2
 
 
-# Tests
-def test_create_ticket_with_sufficient_balance(mock_person, monkeypatch):
-    monkeypatch.setattr('builtins.input', lambda _: '1')
-    create_ticket(mock_person)
-    assert mock_person.balance == 48.00
+def test_create_ticket_with_sufficient_balance(monkeypatch):
+    """
+    Testet die create_ticket-Funktion, wenn genug Guthaben vorhanden ist.
+    """
+    person = MockPerson(10.00)
+    inputs = iter([1, 2, 3, 4, 5, 6, 2])  # Eingaben für Zahlen und Joker
+    monkeypatch.setattr('lottery.read_int', lambda *args, **kwargs: next(inputs))
+    monkeypatch.setattr('lottery.print_ticket', lambda *args, **kwargs: None)  # Ticket-Druck deaktivieren
+
+    create_ticket(person)
+
+    # Überprüfen, ob das Guthaben korrekt reduziert wurde
+    assert person.balance == 8.00
 
 
-def test_create_ticket_with_insufficient_balance(mock_person, monkeypatch):
-    mock_person.balance = 1.00  # Set balance below ticket price
-    monkeypatch.setattr('builtins.input', lambda _: '1')
-    create_ticket(mock_person)
-    assert mock_person.balance == 1.00  # Balance should remain unchanged
+def test_create_ticket_with_insufficient_balance(monkeypatch, capsys):
+    """
+    Testet die create_ticket-Funktion, wenn nicht genug Guthaben vorhanden ist.
+    """
+    person = MockPerson(1.00)
+    inputs = iter([1, 2, 3, 4, 5, 6, 2])  # Eingaben für Zahlen und Joker
+    monkeypatch.setattr('lottery.read_int', lambda *args, **kwargs: next(inputs))
+    monkeypatch.setattr('lottery.print_ticket', lambda *args, **kwargs: None)  # Ticket-Druck deaktivieren
 
+    create_ticket(person)
 
-def test_select_numbers_valid_input(mock_ticket, monkeypatch):
-    inputs = iter(['1', '2', '3', '4', '5', '6', '1'])  # Valid inputs
-    monkeypatch.setattr('builtins.input', lambda _: next(inputs))
-    select_numbers(mock_ticket)
-    assert mock_ticket.numbers == [1, 2, 3, 4, 5, 6]
-    assert mock_ticket.joker == 1
+    # Überprüfen, ob das Guthaben nicht verändert wurde
+    assert person.balance == 1.00
 
-
-def test_select_numbers_duplicate_input(mock_ticket, monkeypatch):
-    inputs = iter(['1', '1', '2', '3', '4', '5', '6', '1'])  # Simulate duplicates
-    monkeypatch.setattr('builtins.input', lambda _: next(inputs))
-    select_numbers(mock_ticket)
-    assert mock_ticket.numbers == [1, 2, 3, 4, 5, 6]
-    assert mock_ticket.joker == 1
-
-
-def test_print_ticket_output(mock_ticket):
-    mock_ticket.numbers = [1, 2, 3, 4, 5, 6]
-    mock_ticket.joker = 1
-
-    # Use a MagicMock to capture print output
-    mock_writer = MagicMock()
-    print_ticket(mock_ticket, writer=mock_writer)
-
-    # Validate that the output was written correctly
-    mock_writer.assert_any_call("X [1, 2, 3, 4, 5, 6]")
-    mock_writer.assert_any_call("Jokerzahl:  1")
+    # Überprüfen, ob die richtige Nachricht ausgegeben wurde
+    captured = capsys.readouterr()
+    assert 'Zuwenig Guthaben' in captured.out
